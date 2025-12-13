@@ -2,117 +2,184 @@
 <html>
 <head>
   <style>
+    /* VARIABLES: Define Light Mode defaults */
+    :root {
+      --bg-color: #ffffff;
+      --text-color: #333333;
+      --border-color: #e5e5e5;
+      --hover-bg: #f5f5f5;
+      --input-bg: #ffffff;
+      --icon-color: #333333;
+      --secondary-text: #888888;
+      --accent-color: #18A0FB;
+      --header-bg: #ffffff;
+    }
+
+    /* VARIABLES: Dark Mode Overrides (System Preference) */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-color: #2c2c2c;
+        --text-color: #f0f0f0;
+        --border-color: #444444;
+        --hover-bg: #3a3a3a;
+        --input-bg: #3a3a3a;
+        --icon-color: #f0f0f0;
+        --secondary-text: #aaaaaa;
+        --header-bg: #2c2c2c;
+      }
+    }
+
     body {
       font-family: Inter, sans-serif;
       margin: 0;
       padding: 0;
-      background: #ffffff;
-      color: #333;
+      background: var(--bg-color);
+      color: var(--text-color);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
+
+    /* HEADER LAYOUT */
     .sticky-header {
-      position: sticky;
-      top: 0;
-      background: #fff;
-      padding: 12px;
-      border-bottom: 1px solid #e5e5e5;
-      z-index: 10;
+      background: var(--header-bg);
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-color);
+      flex-shrink: 0;
     }
+
+    /* CONTROLS */
     input {
       width: 100%;
-      padding: 8px 12px;
-      border: 1px solid #e5e5e5;
+      padding: 7px 10px;
+      border: 1px solid var(--border-color);
       border-radius: 6px;
-      font-size: 13px;
+      font-size: 11px;
       outline: none;
       box-sizing: border-box;
+      background: var(--input-bg);
+      color: var(--text-color);
     }
+
     input:focus {
-      border-color: #18A0FB;
+      border-color: var(--accent-color);
     }
+
+    /* GRID CONTAINER */
+    #grid-container {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    /* GRID: Small & Dense */
     #grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
-      gap: 8px;
-      padding: 12px;
+      /* Min width 48px fits ~6 icons per row */
+      grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+      gap: 4px;
+      padding: 8px;
     }
+
     .icon-item {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 12px 4px;
+      padding: 6px 2px;
       border-radius: 4px;
       cursor: pointer;
       transition: background 0.1s;
+      aspect-ratio: 1 / 1; /* Force square shape */
     }
+
     .icon-item:hover {
-      background: #f0f0f0;
+      background: var(--hover-bg);
     }
+
     .icon-svg {
-      width: 24px;
-      height: 24px;
-      margin-bottom: 8px;
-      color: #333;
+      width: 18px;
+      height: 18px;
+      margin-bottom: 4px;
+      color: var(--icon-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
     }
+
+    /* Ensure inner SVG scales correctly */
+    .icon-svg svg {
+      width: 18px;
+      height: 18px;
+    }
+
     .icon-name {
-      font-size: 10px;
-      color: #888;
+      font-size: 8px; /* Very small text */
+      color: var(--secondary-text);
       text-align: center;
       word-break: break-word;
-      line-height: 1.2;
+      line-height: 1;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      pointer-events: none;
     }
+
     #loading {
       text-align: center;
       padding: 20px;
-      color: #888;
-      font-size: 12px;
-    }
-    .hidden {
-      display: none !important;
+      color: var(--secondary-text);
+      font-size: 11px;
     }
   </style>
 </head>
 <body>
 
   <div class="sticky-header">
-    <input type="text" id="search" placeholder="Search icons (e.g. user, arrow, settings)..." autocomplete="off">
+    <input type="text" id="search" placeholder="Search icons (e.g. arrow, user)..." autocomplete="off" autofocus>
   </div>
 
-  <div id="loading">Loading library...</div>
-  <div id="grid"></div>
+  <div id="grid-container">
+    <div id="loading">Loading library...</div>
+    <div id="grid"></div>
+  </div>
 
   <script>
     let allIcons = [];
 
-    // Listen for the data from code.ts
+    // Listen for data from code.ts
     window.onmessage = (event) => {
       const msg = event.data.pluginMessage;
       if (msg.type === 'load-icons') {
         allIcons = msg.icons;
         renderIcons(allIcons);
-        document.getElementById('loading').remove();
+        const loading = document.getElementById('loading');
+        if (loading) loading.remove();
+        
+        // Auto-focus search after load
+        document.getElementById('search').focus();
       }
     };
 
-    // Render the grid
+    // Render Grid
     function renderIcons(icons) {
       const container = document.getElementById('grid');
-      container.innerHTML = ''; // Clear current
+      container.innerHTML = ''; 
 
-      // Use a DocumentFragment for better performance
       const fragment = document.createDocumentFragment();
 
       icons.forEach(icon => {
         const div = document.createElement('div');
         div.className = 'icon-item';
+        div.title = icon.pascalName; // Tooltip
         div.onclick = () => insertIcon(icon.pascalName);
         
-        // SVG
         const svgContainer = document.createElement('div');
         svgContainer.className = 'icon-svg';
         svgContainer.innerHTML = icon.svg; 
         
-        // Name Label
         const label = document.createElement('div');
         label.className = 'icon-name';
         label.textContent = icon.pascalName;
@@ -125,36 +192,39 @@
       container.appendChild(fragment);
     }
 
-    // Insert function
     function insertIcon(pascalName) {
       parent.postMessage({ pluginMessage: { type: 'insert-icon', name: pascalName } }, '*');
     }
 
-    // Search Logic
+    // --- FILTER LOGIC ---
     const searchInput = document.getElementById('search');
-    searchInput.addEventListener('input', (e) => {
-      const query = e.target.value.toLowerCase().trim();
-      
+
+    function filterIcons() {
+      const query = searchInput.value.toLowerCase().trim();
+
+      // If empty, show all
       if (!query) {
-        renderIcons(allIcons); // Show all if empty
+        renderIcons(allIcons);
         return;
       }
 
       const filtered = allIcons.filter(icon => {
-        // 1. Check Name
+        // Search in Name
         const nameMatch = icon.name.toLowerCase().includes(query) || 
                           icon.pascalName.toLowerCase().includes(query);
         
-        // 2. Check Tags (ensure tags is an array before using .some)
+        // Search in Tags
         const tags = Array.isArray(icon.tags) ? icon.tags : [];
         const tagMatch = tags.some(tag => tag.toLowerCase().includes(query));
-        
-        // Return true if either matches
+
         return nameMatch || tagMatch;
       });
 
       renderIcons(filtered);
-    });
+    }
+
+    searchInput.addEventListener('input', filterIcons);
+
   </script>
 </body>
 </html>
