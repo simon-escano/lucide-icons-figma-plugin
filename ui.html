@@ -1,17 +1,160 @@
-<h2>Rectangle Creator</h2>
-<p>Count: <input id="count" type="number" value="5"></p>
-<button id="create">Create</button>
-<button id="cancel">Cancel</button>
-<script>
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      font-family: Inter, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      color: #333;
+    }
+    .sticky-header {
+      position: sticky;
+      top: 0;
+      background: #fff;
+      padding: 12px;
+      border-bottom: 1px solid #e5e5e5;
+      z-index: 10;
+    }
+    input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #e5e5e5;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+      box-sizing: border-box;
+    }
+    input:focus {
+      border-color: #18A0FB;
+    }
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+      gap: 8px;
+      padding: 12px;
+    }
+    .icon-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 4px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .icon-item:hover {
+      background: #f0f0f0;
+    }
+    .icon-svg {
+      width: 24px;
+      height: 24px;
+      margin-bottom: 8px;
+      color: #333;
+    }
+    .icon-name {
+      font-size: 10px;
+      color: #888;
+      text-align: center;
+      word-break: break-word;
+      line-height: 1.2;
+    }
+    #loading {
+      text-align: center;
+      padding: 20px;
+      color: #888;
+      font-size: 12px;
+    }
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
 
-document.getElementById('create').onclick = () => {
-  const textbox = document.getElementById('count');
-  const count = parseInt(textbox.value, 10);
-  parent.postMessage({ pluginMessage: { type: 'create-shapes', count } }, '*')
-}
+  <div class="sticky-header">
+    <input type="text" id="search" placeholder="Search icons (e.g. user, arrow, settings)..." autocomplete="off">
+  </div>
 
-document.getElementById('cancel').onclick = () => {
-  parent.postMessage({ pluginMessage: { type: 'cancel' } }, '*')
-}
+  <div id="loading">Loading library...</div>
+  <div id="grid"></div>
 
-</script>
+  <script>
+    let allIcons = [];
+
+    // Listen for the data from code.ts
+    window.onmessage = (event) => {
+      const msg = event.data.pluginMessage;
+      if (msg.type === 'load-icons') {
+        allIcons = msg.icons;
+        renderIcons(allIcons);
+        document.getElementById('loading').remove();
+      }
+    };
+
+    // Render the grid
+    function renderIcons(icons) {
+      const container = document.getElementById('grid');
+      container.innerHTML = ''; // Clear current
+
+      // Use a DocumentFragment for better performance
+      const fragment = document.createDocumentFragment();
+
+      icons.forEach(icon => {
+        const div = document.createElement('div');
+        div.className = 'icon-item';
+        div.onclick = () => insertIcon(icon.pascalName);
+        
+        // SVG
+        const svgContainer = document.createElement('div');
+        svgContainer.className = 'icon-svg';
+        svgContainer.innerHTML = icon.svg; 
+        
+        // Name Label
+        const label = document.createElement('div');
+        label.className = 'icon-name';
+        label.textContent = icon.pascalName;
+
+        div.appendChild(svgContainer);
+        div.appendChild(label);
+        fragment.appendChild(div);
+      });
+
+      container.appendChild(fragment);
+    }
+
+    // Insert function
+    function insertIcon(pascalName) {
+      parent.postMessage({ pluginMessage: { type: 'insert-icon', name: pascalName } }, '*');
+    }
+
+    // Search Logic
+    const searchInput = document.getElementById('search');
+    searchInput.addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase().trim();
+      
+      if (!query) {
+        renderIcons(allIcons); // Show all if empty
+        return;
+      }
+
+      const filtered = allIcons.filter(icon => {
+        // 1. Check Name
+        const nameMatch = icon.name.toLowerCase().includes(query) || 
+                          icon.pascalName.toLowerCase().includes(query);
+        
+        // 2. Check Tags (ensure tags is an array before using .some)
+        const tags = Array.isArray(icon.tags) ? icon.tags : [];
+        const tagMatch = tags.some(tag => tag.toLowerCase().includes(query));
+        
+        // Return true if either matches
+        return nameMatch || tagMatch;
+      });
+
+      renderIcons(filtered);
+    });
+  </script>
+</body>
+</html>
