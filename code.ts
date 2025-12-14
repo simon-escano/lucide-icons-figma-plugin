@@ -86,7 +86,7 @@ figma.ui.onmessage = async (msg) => {
         const parentSet = mainComponent?.parent;
         
         // If it matches our Lucide Component Set
-        if (parentSet && parentSet.key === COMPONENT_SET_KEY) {
+        if (parentSet && parentSet.type === "COMPONENT_SET" && parentSet.key === COMPONENT_SET_KEY) {
            figma.notify(`Swapping to ${msg.name}...`);
            try {
              // Changing properties preserves size and color overrides automatically
@@ -117,8 +117,7 @@ figma.ui.onmessage = async (msg) => {
         // SCENARIO A: Target is a Container (Frame/Group) AND NOT an Instance
         // (We cannot append children to an Instance)
         if (
-          (target.type === "FRAME" || target.type === "GROUP" || target.type === "SECTION") &&
-          target.type !== "INSTANCE"
+          target.type === "FRAME" || target.type === "GROUP" || target.type === "SECTION"
         ) {
            // Double check we aren't inside an instance logic (handled by try-catch below)
            try {
@@ -160,7 +159,7 @@ figma.ui.onmessage = async (msg) => {
 function placeBeside(target: SceneNode, instance: SceneNode) {
   const parent = target.parent;
   
-  if (parent && parent.type !== "INSTANCE" && parent.type !== "mainComponent") {
+  if (parent && parent.type !== "INSTANCE") {
     // Append to same parent
     parent.appendChild(instance);
     
