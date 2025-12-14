@@ -12,6 +12,66 @@ const COMPONENT_SET_KEY = "2e95241c43275cb8fff07552f3e0805c38e02ba3";
 const toPascalCase = (str: string) =>
   str.replace(/(^\w|-\w)/g, (clear) => clear.replace(/-/, "").toUpperCase());
 
+// Helper: Extract color from an instance (finds first vector with a visible fill)
+function extractColorFromInstance(instance: InstanceNode): Paint | null {
+  function findColorInNode(node: SceneNode): Paint | null {
+    // Check if it's a vector node with fills
+    if (node.type === 'VECTOR' || node.type === 'ELLIPSE' || node.type === 'RECTANGLE' || node.type === 'POLYGON' || node.type === 'STAR' || node.type === 'LINE') {
+      if ('fills' in node && node.fills !== figma.mixed && Array.isArray(node.fills) && node.fills.length > 0) {
+        const fill = node.fills[0];
+        if (fill.type === 'SOLID') {
+          return fill;
+        }
+      }
+    }
+    
+    if ('children' in node) {
+      for (const child of node.children) {
+        const color = findColorInNode(child);
+        if (color) return color;
+      }
+    }
+    
+    return null;
+  }
+  
+  return findColorInNode(instance);
+}
+
+// Helper: Apply a single color to all vectors in an instance
+function unifyInstanceColor(instance: InstanceNode, color: Paint | null) {
+  if (!color || color.type !== 'SOLID') return;
+  
+  const solidColor: SolidPaint = color;
+  
+  function applyColorToNode(node: SceneNode) {
+    // Apply to vector nodes specifically
+    if (node.type === 'VECTOR' || node.type === 'ELLIPSE' || node.type === 'RECTANGLE' || node.type === 'POLYGON' || node.type === 'STAR' || node.type === 'LINE') {
+      if ('fills' in node) {
+        try {
+          // Set the fill color
+          node.fills = [solidColor];
+          // Ensure fills are visible (important for vectors that might have hidden fills)
+          if ('fillsVisible' in node && typeof (node as any).fillsVisible === 'boolean') {
+            (node as any).fillsVisible = true;
+          }
+        } catch (e) {
+          // Some nodes might not allow fill changes (e.g., locked)
+          console.warn('Could not apply color to node:', e);
+        }
+      }
+    }
+    
+    if ('children' in node) {
+      for (const child of node.children) {
+        applyColorToNode(child);
+      }
+    }
+  }
+  
+  applyColorToNode(instance);
+}
+
 // Helper: Safely build SVG string
 const createSvgString = (iconNode: any) => {
   if (!Array.isArray(iconNode)) return '';
@@ -89,8 +149,15 @@ figma.ui.onmessage = async (msg) => {
         if (parentSet && parentSet.type === "COMPONENT_SET" && parentSet.key === COMPONENT_SET_KEY) {
            figma.notify(`Swapping to ${msg.name}...`);
            try {
+             // Extract color before swapping
+             const colorToCopy = extractColorFromInstance(target);
              // Changing properties preserves size and color overrides automatically
              target.setProperties({ [propertyName]: msg.name });
+             // Apply unified color to all vectors after swap
+             if (colorToCopy) {
+               unifyInstanceColor(target, colorToCopy);
+             }
+             figma.closePlugin(); // Close UI after successful swap
              return; // Done! No need to create new icon
            } catch (e) {
              console.error("Swap failed", e);
@@ -142,6 +209,9 @@ figma.ui.onmessage = async (msg) => {
       }
 
       figma.currentPage.selection = [instance];
+      
+      // Close UI after successful placement
+      figma.closePlugin();
 
     } catch (error: any) {
       console.error(error);
